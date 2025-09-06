@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ATTS TEST–01</title>
+  <title>ATTS TEST–02</title>
   <style>
     body { font-family: Arial, sans-serif; margin:0; background:#f4f6f9; }
     header { background:#222; color:#fff; padding:10px; text-align:center; position:relative; }
@@ -20,22 +20,17 @@
     .view-score-btn { display:none; background:#28a745; color:white; padding:15px 25px; border-radius:8px; cursor:pointer; text-align:center; margin:20px auto; font-size:18px; font-weight:bold; }
     .close-btn { background:#dc3545; color:white; width:100%; margin-top:20px; padding:12px; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer; display:none; }
 
-    /* Review Mode Colors */
     .correct { background:#d4edda; border:2px solid green !important; }
     .wrong { background:#f8d7da; border:2px solid red !important; }
-
-    /* Answer Info */
     .answer-info { margin-top:8px; font-size:14px; }
     .answer-info .correct-text { color:green; font-weight:bold; }
     .answer-info .wrong-text { color:blue; font-weight:bold; }
 
-    /* Buttons Color */
     .btn-yellow { background:#fff3cd; color:#000; border:1px solid #ffc107; }
     .btn-red { background:#f8d7da; color:#000; border:1px solid #dc3545; }
     .btn-green { background:#d4edda; color:#000; border:1px solid #28a745; }
     .btn-blue { background:#d1ecf1; color:#000; border:1px solid #17a2b8; }
 
-    /* Popup modal */
     .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; }
     .modal-content { background:#fff; padding:20px; border-radius:10px; max-width:400px; width:90%; text-align:center; }
     .modal-content h3 { margin-bottom:15px; }
@@ -68,7 +63,6 @@
     <button id="closeBtn" class="close-btn">Close Test</button>
   </div>
 
-  <!-- Modal -->
   <div id="confirmModal" class="modal">
     <div class="modal-content">
       <h3 id="modalMsg"></h3>
@@ -76,7 +70,6 @@
     </div>
   </div>
 
-  <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js";
@@ -98,20 +91,16 @@
     let questions=[], answerKey={};
     let inViewScore=false;
 
-    // Auto load fixed PDF
     window.addEventListener("load", async ()=>{
       let pdf=await pdfjsLib.getDocument("test.pdf").promise;
       let total=pdf.numPages;
       questions=[];
 
-      // ✅ Extract last page (Answer Key Table)
       let lastPage=await pdf.getPage(total);
       let txtContent=await lastPage.getTextContent();
       let txt=txtContent.items.map(i=>i.str).join(" ");
       
-      // Parse format like: "Que. 1 2 3 ... Ans. C C A ..."
-      let qNumbers=[];
-      let qAnswers=[];
+      let qNumbers=[], qAnswers=[];
       let parts=txt.split(/\s+/);
 
       let mode=null;
@@ -121,12 +110,10 @@
         if(mode==="q" && !isNaN(p)){ qNumbers.push(parseInt(p)); }
         if(mode==="a" && /^[A-D]$/i.test(p)){ qAnswers.push(p.toUpperCase()); }
       }
-
       qNumbers.forEach((q,i)=>{ answerKey[q]=qAnswers[i]; });
 
-      // ✅ Load question images (all except last page)
+      // store question number properly
       for(let i=1;i<total;i++){
-        if(i===total) break;
         let page=await pdf.getPage(i);
         let viewport=page.getViewport({scale:1.2});
         let canvas=document.createElement("canvas");
@@ -134,11 +121,10 @@
         canvas.width=viewport.width; canvas.height=viewport.height;
         await page.render({canvasContext:ctx,viewport}).promise;
         let img=canvas.toDataURL("image/png");
-        questions.push({id:i, image:img});
+        questions.push({id:i, qNumber:i, image:img});
       }
     });
 
-    // Modal helper
     function showModal(msg,buttons){
       modalMsg.innerHTML=msg;
       modalBtns.innerHTML="";
@@ -152,7 +138,6 @@
       modal.style.display="flex";
     }
 
-    // Start Test
     startBtn.addEventListener("click",()=>{
       showModal("Are you Sure to Start this Test🙂",[
         {text:"Back", class:"btn-cancel", action:()=>{}},
@@ -183,7 +168,7 @@
         <div class="question">
           <img src="${q.image}" class="question-img">
           <div class="options">
-            ${opts.map(o=>`<label><input type="radio" name="q${i}" value="${o}" ${answers[i]==o?"checked":""}> Option ${o}</label>`).join("")}
+            ${opts.map(o=>`<label><input type="radio" name="q${i}" value="${o}" ${answers[q.qNumber]==o?"checked":""}> Option ${o}</label>`).join("")}
           </div>
         </div>
         <div class="nav-buttons">
@@ -194,7 +179,7 @@
         </div>
       `;
       document.querySelectorAll(`input[name="q${i}"]`).forEach(r=>{
-        r.addEventListener("change",e=>{answers[i]=e.target.value;});
+        r.addEventListener("change",e=>{answers[q.qNumber]=e.target.value;});
       });
     }
 
@@ -215,8 +200,8 @@
       quizDiv.style.display="none"; submitBtn.style.display="none";
       let attempted=Object.keys(answers).length;
       let correct=0;
-      Object.keys(answers).forEach(i=>{
-        if(answers[i]==answerKey[parseInt(i)+1]) correct++;
+      Object.keys(answers).forEach(qNo=>{
+        if(answers[qNo]==answerKey[qNo]) correct++;
       });
       let wrong=attempted-correct;
       let unattempt=questions.length-attempted;
@@ -264,8 +249,8 @@
 
     function showScoreQ(i){
       let q=questions[i];
-      let corr=answerKey[i+1]||null;
-      let chosen=answers[i]||null;
+      let corr=answerKey[q.qNumber]||null;
+      let chosen=answers[q.qNumber]||null;
       let opts=["A","B","C","D"];
       quizDiv.style.display="block";
       quizDiv.innerHTML=`
